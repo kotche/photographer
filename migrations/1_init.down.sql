@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS photographers;
+DROP TABLE IF EXISTS clients;
+DROP TABLE IF EXISTS debt_client;
+DROP TABLE IF EXISTS money_client;
