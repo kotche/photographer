@@ -14,7 +14,7 @@ type Service interface {
 	CreatePhotographer(ctx context.Context, name string) (domain.PhotographerID, error)
 	GetPhotographers(ctx context.Context) ([]domain.Photographer, error)
 
-	CreateClient(ctx context.Context, name string) (int, error)
+	CreateClient(ctx context.Context, photographerID domain.PhotographerID, name string) (domain.ClientID, error)
 	UpdateClient(ctx context.Context, id domain.ClientID, name string) error
 	DeleteClient(ctx context.Context, id domain.ClientID) error
 	GetClients(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Client, error)
@@ -97,7 +97,29 @@ func (h *Handler) getPhotographersHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (h *Handler) createClientHandler(w http.ResponseWriter, r *http.Request) {
+	type createClientRequest struct {
+		PhotographerID domain.PhotographerID `json:"photographer_id"`
+		Name           string                `json:"name"`
+	}
 
+	var req createClientRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("json decode error: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	id, err := h.service.CreateClient(r.Context(), req.PhotographerID, req.Name)
+	if err != nil {
+		log.Printf("create client error,: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err = json.NewEncoder(w).Encode(id); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func (h *Handler) updateClientHandler(w http.ResponseWriter, r *http.Request) {
@@ -109,14 +131,19 @@ func (h *Handler) updateClientHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var name string
-	if err = json.NewDecoder(r.Body).Decode(&name); err != nil {
+	type updateClientRequest struct {
+		Name string `json:"name"`
+	}
+
+	var req updateClientRequest
+
+	if err = json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("json decode error: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	if err = h.service.UpdateClient(r.Context(), domain.ClientID(id), name); err != nil {
+	if err = h.service.UpdateClient(r.Context(), domain.ClientID(id), req.Name); err != nil {
 		log.Printf("update client error,: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
@@ -132,7 +159,25 @@ func (h *Handler) deleteClientHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getClientsHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	photographerID, err := strconv.Atoi(vars["photographerID"])
+	if err != nil {
+		log.Printf("convert id '%s' to int error: %v", vars["id"], err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
+	clients, err := h.service.GetClients(r.Context(), domain.PhotographerID(photographerID))
+	if err != nil {
+		log.Printf("get clients error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err = json.NewEncoder(w).Encode(clients); err != nil {
+		log.Printf("json encode error: %v", err)
+	}
 }
 
 func (h *Handler) createDebtHandler(w http.ResponseWriter, r *http.Request) {

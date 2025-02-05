@@ -9,7 +9,7 @@ type Repository interface {
 	CreatePhotographer(ctx context.Context, name string) (domain.PhotographerID, error)
 	GetPhotographers(ctx context.Context) ([]domain.Photographer, error)
 
-	CreateClient(ctx context.Context, name string) (int, error)
+	CreateClient(ctx context.Context, photographerID domain.PhotographerID, name string) (domain.ClientID, error)
 	UpdateClient(ctx context.Context, id domain.ClientID, name string) error
 	DeleteClient(ctx context.Context, id domain.ClientID) error
 	GetClients(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Client, error)
@@ -37,8 +37,8 @@ func (s *Service) GetPhotographers(ctx context.Context) ([]domain.Photographer, 
 	return s.repo.GetPhotographers(ctx)
 }
 
-func (s *Service) CreateClient(ctx context.Context, name string) (int, error) {
-	return s.repo.CreateClient(ctx, name)
+func (s *Service) CreateClient(ctx context.Context, photographerID domain.PhotographerID, name string) (domain.ClientID, error) {
+	return s.repo.CreateClient(ctx, photographerID, name)
 }
 
 func (s *Service) UpdateClient(ctx context.Context, id domain.ClientID, name string) error {
