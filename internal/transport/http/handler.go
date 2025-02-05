@@ -13,7 +13,17 @@ import (
 type Service interface {
 	CreatePhotographer(ctx context.Context, name string) (domain.PhotographerID, error)
 	GetPhotographers(ctx context.Context) ([]domain.Photographer, error)
+
+	CreateClient(ctx context.Context, name string) (int, error)
 	UpdateClient(ctx context.Context, id domain.ClientID, name string) error
+	DeleteClient(ctx context.Context, id domain.ClientID) error
+	GetClients(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Client, error)
+
+	CreatDebt(ctx context.Context, photographerID domain.PhotographerID, clientID domain.ClientID, amount int) error
+	GetDebts(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Debt, error)
+
+	CreatePayment(ctx context.Context, photographerID domain.PhotographerID, clientID domain.ClientID, amount int) error
+	GetPayments(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Payment, error)
 }
 
 type Handler struct {
@@ -36,13 +46,13 @@ func (h *Handler) Handle() *mux.Router {
 	router.HandleFunc("/clients", h.createClientHandler).Methods("POST")
 	router.HandleFunc("/clients/{id}", h.updateClientHandler).Methods("PUT")
 	router.HandleFunc("/clients/{id}", h.deleteClientHandler).Methods("DELETE")
-	router.HandleFunc("/clients", h.getClientsHandler).Methods("GET")
+	router.HandleFunc("/clients/{photographerID}", h.getClientsHandler).Methods("GET")
 
 	// Операции с денежными средствами
-	router.HandleFunc("/debt", h.createDebtHandler).Methods("POST")               // добавить запись о задолженности
-	router.HandleFunc("/transaction", h.createTransactionHandler).Methods("POST") // провести оплату/возврат с обновлением debt_client
-	router.HandleFunc("/debtors", h.getDebtorsHandler).Methods("GET")             // список должников
-	router.HandleFunc("/incomes", h.getIncomesHandler).Methods("GET")             // операции и суммарный доход
+	router.HandleFunc("/debt", h.createDebtHandler).Methods("POST")                    // добавить запись о задолженности
+	router.HandleFunc("/transaction", h.createTransactionHandler).Methods("POST")      // провести оплату/возврат с обновлением debt_client
+	router.HandleFunc("/debtors/{photographerID}", h.getDebtorsHandler).Methods("GET") // список должников у фотографа
+	router.HandleFunc("/incomes/{photographerID}", h.getIncomesHandler).Methods("GET") // операции и суммарный доход у фотографа
 
 	return router
 }
@@ -117,7 +127,15 @@ func (h *Handler) updateClientHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) getIncomesHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) deleteClientHandler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (h *Handler) getClientsHandler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (h *Handler) createDebtHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
@@ -129,14 +147,6 @@ func (h *Handler) createTransactionHandler(w http.ResponseWriter, r *http.Reques
 
 }
 
-func (h *Handler) createDebtHandler(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (h *Handler) getClientsHandler(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func (h *Handler) deleteClientHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) getIncomesHandler(w http.ResponseWriter, r *http.Request) {
 
 }

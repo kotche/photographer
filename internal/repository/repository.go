@@ -33,7 +33,7 @@ func (r *Repository) CreatePhotographer(ctx context.Context, name string) (domai
 }
 
 func (r *Repository) GetPhotographers(ctx context.Context) ([]domain.Photographer, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT id, name FROM photographers WHERE deleted_at is null")
+	rows, err := r.db.QueryContext(ctx, "SELECT id, name, created_at FROM photographers")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get photographers: %w", err)
 	}
@@ -41,7 +41,7 @@ func (r *Repository) GetPhotographers(ctx context.Context) ([]domain.Photographe
 	var photographers []domain.Photographer
 	for rows.Next() {
 		var photographer domain.Photographer
-		if err = rows.Scan(&photographer.ID, &photographer.Name); err != nil {
+		if err = rows.Scan(&photographer.ID, &photographer.Name, &photographer.CreatedAt); err != nil {
 			return nil, fmt.Errorf("failed to scan note: %w", err)
 		}
 		photographers = append(photographers, photographer)
