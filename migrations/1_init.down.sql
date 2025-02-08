@@ -1,4 +1,5 @@
-DROP TABLE IF EXISTS photographers;
-DROP TABLE IF EXISTS clients;
 DROP TABLE IF EXISTS debts;
 DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS clients;
+DROP TABLE IF EXISTS photographers;
+

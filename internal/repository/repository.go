@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"fmt"
 	_ "github.com/lib/pq"
-	"log"
 	"photographer/internal/domain"
 )
 
@@ -34,7 +33,7 @@ func (r *Repository) CreatePhotographer(ctx context.Context, name string) (domai
 }
 
 func (r *Repository) GetPhotographers(ctx context.Context) ([]domain.Photographer, error) {
-	rows, err := r.db.QueryContext(ctx, "SELECT id, name, created_at FROM photographers")
+	rows, err := r.db.QueryContext(ctx, "SELECT id, name, created_at at time zone 'Europe/Moscow' FROM photographers")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get photographers: %w", err)
 	}
@@ -68,7 +67,7 @@ func (r *Repository) CreateClient(ctx context.Context, photographerID domain.Pho
 }
 
 func (r *Repository) UpdateClient(ctx context.Context, id domain.ClientID, name string) error {
-	query := `update clients set name = $1 where id = $2`
+	query := `update clients set name = $1, updated_at = now() where id = $2`
 
 	if _, err := r.db.ExecContext(ctx, query, name, id); err != nil {
 		return fmt.Errorf("failed to update client: %w", err)
@@ -89,7 +88,10 @@ func (r *Repository) DeleteClient(ctx context.Context, id domain.ClientID) error
 
 func (r *Repository) GetClients(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Client, error) {
 	query := `
-		select id, photographer_id, name, created_at, updated_at, deleted_at
+		select id, photographer_id, name, 
+		       created_at at time zone 'Europe/Moscow', 
+		       updated_at at time zone 'Europe/Moscow', 
+		       deleted_at at time zone 'Europe/Moscow'
 		from clients
 		where photographer_id = $1
 	`
@@ -119,9 +121,7 @@ func (r *Repository) AddDebt(ctx context.Context, photographerID domain.Photogra
 	}
 
 	defer func() {
-		if errTrx := tx.Rollback(); errTrx != nil {
-			log.Printf("AddDebt: failed to rollback transaction: %v", errTrx)
-		}
+		_ = tx.Rollback()
 	}()
 
 	currentDebt, err := getDebt(ctx, tx, photographerID, clientID)
@@ -138,9 +138,10 @@ func (r *Repository) AddDebt(ctx context.Context, photographerID domain.Photogra
 
 func (r *Repository) GetDebts(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Debt, error) {
 	query := `
-		select client_id, amount, occurred_at
+		select client_id, c.name, amount, occurred_at at time zone 'Europe/Moscow'
 		from debts
-		where photographer_id = $1
+		join public.clients c on debts.client_id = c.id
+		where debts.photographer_id = $1
 	`
 
 	rows, err := r.db.QueryContext(ctx, query, photographerID)
@@ -151,7 +152,7 @@ func (r *Repository) GetDebts(ctx context.Context, photographerID domain.Photogr
 	var debts []domain.Debt
 	for rows.Next() {
 		var debt domain.Debt
-		if err = rows.Scan(&debt.ClientID, &debt.Amount, &debt.OccurredAt); err != nil {
+		if err = rows.Scan(&debt.ClientID, &debt.ClientName, &debt.Amount, &debt.OccurredAt); err != nil {
 			return nil, fmt.Errorf("failed to scan debts: %w", err)
 		}
 		debts = append(debts, debt)
@@ -167,9 +168,7 @@ func (r *Repository) AddPayment(ctx context.Context, photographerID domain.Photo
 	}
 
 	defer func() {
-		if errTrx := tx.Rollback(); errTrx != nil {
-			log.Printf("AddPayment: failed to rollback transaction: %v", errTrx)
-		}
+		_ = tx.Rollback()
 	}()
 
 	sumDebt, err := getDebt(ctx, tx, photographerID, clientID)
@@ -189,7 +188,7 @@ func (r *Repository) AddPayment(ctx context.Context, photographerID domain.Photo
 		}
 	}
 
-	if err = addPayment(ctx, tx, photographerID, clientID, dif); err != nil {
+	if err = addPayment(ctx, tx, photographerID, clientID, amount); err != nil {
 		return err
 	}
 
@@ -198,7 +197,7 @@ func (r *Repository) AddPayment(ctx context.Context, photographerID domain.Photo
 
 func (r *Repository) GetPayments(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Payment, error) {
 	query := `
-		select client_id, amount, occurred_at
+		select client_id, amount, occurred_at at time zone 'Europe/Moscow'
 		from payments
 		where photographer_id = $1
 	`
@@ -222,7 +221,7 @@ func (r *Repository) GetPayments(ctx context.Context, photographerID domain.Phot
 
 func (r *Repository) GetPaymentsTotal(ctx context.Context, photographerID domain.PhotographerID) (int, error) {
 	query := `
-		select sum(amount)
+		select coalesce(sum(amount),0)
 		from payments
 		where photographer_id = $1
 	`
@@ -252,7 +251,7 @@ func addDebt(ctx context.Context, tx *sql.Tx, photographerID domain.Photographer
 
 func getDebt(ctx context.Context, tx *sql.Tx, photographerID domain.PhotographerID, clientID domain.ClientID) (int, error) {
 	query := `
-		select sum(amount) from debts
+		select coalesce(sum(amount),0) from debts
 		where photographer_id = $1 and client_id = $2
 	`
 

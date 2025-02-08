@@ -474,6 +474,9 @@ const docTemplate = `{
                 "client_id": {
                     "type": "integer"
                 },
+                "client_name": {
+                    "type": "string"
+                },
                 "occurredAt": {
                     "type": "string"
                 }

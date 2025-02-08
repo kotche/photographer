@@ -19,6 +19,7 @@ type Client struct {
 
 type Debt struct {
 	ClientID   ClientID `json:"client_id"`
+	ClientName string   `json:"client_name"`
 	Amount     int      `json:"amount"`
 	OccurredAt time.Time
 }

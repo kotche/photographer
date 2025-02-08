@@ -20,6 +20,8 @@ definitions:
         type: integer
       client_id:
         type: integer
+      client_name:
+        type: string
       occurredAt:
         type: string
     type: object

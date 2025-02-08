@@ -1,4 +1,4 @@
-.PHONY: docker-up rebuild
+.PHONY: docker-up rebuild swag
 
 docker-up:
 	docker-compose up --build -d
