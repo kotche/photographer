@@ -14,6 +14,9 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+
+	httpSwagger "github.com/swaggo/http-swagger"
+	_ "photographer/docs" // импорт сгенерированных документов
 )
 
 func main() {
@@ -44,8 +47,12 @@ func main() {
 	_service := service.New(repo)
 	router := http_handler.NewHandler(_service)
 
+	// Добавляем маршрут для Swagger UI
+	muxRouter := router.Handle()
+	muxRouter.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
+
 	log.Println("Server starting on port 8080...")
-	if err = http.ListenAndServe(":8080", router.Handle()); err != nil {
+	if err = http.ListenAndServe(":8080", muxRouter); err != nil {
 		log.Fatal(err)
 	}
 }

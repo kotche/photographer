@@ -6,3 +6,6 @@ docker-up:
 rebuild:
 	docker-compose down
 	docker-compose up --build -d
+
+swag:
+	swag init -g cmd/main.go

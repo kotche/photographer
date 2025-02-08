@@ -57,10 +57,17 @@ func (h *Handler) Handle() *mux.Router {
 	return router
 }
 
+// @Summary Создаёт нового фотографа
+// @Tags Photographers
+// @Accept json
+// @Produce json
+// @Param request body CreatePhotographerRequest true "Payload для создания фотографа"
+// @Success 200 {object} CreatePhotographerResponse "ID созданного фотографа"
+// @Failure 400 {string} text/plain
+// @Failure 500 {string} text/plain
+// @Router /photographers [post]
 func (h *Handler) createPhotographerHandler(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Name string `json:"name"`
-	}
+	var req CreatePhotographerRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("json decode error: %v", err)
@@ -71,12 +78,19 @@ func (h *Handler) createPhotographerHandler(w http.ResponseWriter, r *http.Reque
 	id, err := h.service.CreatePhotographer(r.Context(), req.Name)
 	if err != nil {
 		log.Printf("create photographer error,: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	encodeResponse(w, id)
+	encodeResponse(w, CreatePhotographerResponse{ID: id})
 }
 
+// @Summary Возвращает список фотографов
+// @Tags Photographers
+// @Accept json
+// @Produce json
+// @Success 200 {array} domain.Photographer
+// @Failure 500 {string} text/plain
+// @Router /photographers [get]
 func (h *Handler) getPhotographersHandler(w http.ResponseWriter, r *http.Request) {
 	photographers, err := h.service.GetPhotographers(r.Context())
 	if err != nil {
@@ -88,6 +102,15 @@ func (h *Handler) getPhotographersHandler(w http.ResponseWriter, r *http.Request
 	encodeResponse(w, photographers)
 }
 
+// @Summary Создаёт нового клиента
+// @Tags Clients
+// @Accept json
+// @Produce json
+// @Param request body CreateClientRequest true "Payload для создания клиента"
+// @Success 200 {object} CreateClientResponse "ID созданного клиента"
+// @Failure 400 {string} text/plain
+// @Failure 500 {string} text/plain
+// @Router /clients [post]
 func (h *Handler) createClientHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		PhotographerID domain.PhotographerID `json:"photographer_id"`
@@ -103,12 +126,22 @@ func (h *Handler) createClientHandler(w http.ResponseWriter, r *http.Request) {
 	id, err := h.service.CreateClient(r.Context(), req.PhotographerID, req.Name)
 	if err != nil {
 		log.Printf("create client error,: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	encodeResponse(w, id)
+	encodeResponse(w, CreateClientResponse{ID: id})
 }
 
+// @Summary Обновляет данные клиента
+// @Tags Clients
+// @Accept json
+// @Produce json
+// @Param id path int true "ID клиента"
+// @Param request body UpdateClientRequest true "Payload для обновления клиента"
+// @Success 200
+// @Failure 400 {string} text/plain
+// @Failure 500 {string} text/plain
+// @Router /clients/{id} [put]
 func (h *Handler) updateClientHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
@@ -132,10 +165,19 @@ func (h *Handler) updateClientHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err = h.service.UpdateClient(r.Context(), domain.ClientID(id), req.Name); err != nil {
 		log.Printf("update client error,: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
+// @Summary Удаляет клиента по ID
+// @Tags Clients
+// @Accept json
+// @Produce json
+// @Param id path int true "ID клиента"
+// @Success 200
+// @Failure 400 {string} text/plain
+// @Failure 500 {string} text/plain
+// @Router /clients/{id} [delete]
 func (h *Handler) deleteClientHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
@@ -147,10 +189,19 @@ func (h *Handler) deleteClientHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err = h.service.DeleteClient(r.Context(), domain.ClientID(id)); err != nil {
 		log.Printf("delete client error: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
 
+// @Summary Возвращает список клиентов фотографа
+// @Tags Clients
+// @Accept json
+// @Produce json
+// @Param photographerID path int true "ID фотографа"
+// @Success 200 {array} domain.Client
+// @Failure 400 {string} text/plain
+// @Failure 500 {string} text/plain
+// @Router /clients/{photographerID} [get]
 func (h *Handler) getClientsHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	photographerID, err := strconv.Atoi(vars["photographerID"])
@@ -170,6 +221,15 @@ func (h *Handler) getClientsHandler(w http.ResponseWriter, r *http.Request) {
 	encodeResponse(w, clients)
 }
 
+// @Summary Добавляет задолженность для клиента фотографа
+// @Tags Financial
+// @Accept json
+// @Produce json
+// @Param request body AddDebtRequest true "Payload для добавления задолженности"
+// @Success 200
+// @Failure 400 {string} text/plain
+// @Failure 500 {string} text/plain
+// @Router /debt [post]
 func (h *Handler) addDebtHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		PhotographerID int `json:"photographer_id"`
@@ -190,6 +250,15 @@ func (h *Handler) addDebtHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// @Summary Получает список должников фотографа
+// @Tags Financial
+// @Accept json
+// @Produce json
+// @Param photographerID path int true "ID фотографа"
+// @Success 200 {array} domain.Debt "Список задолженностей"
+// @Failure 400 {string} text/plain
+// @Failure 500 {string} text/plain
+// @Router /debtors/{photographerID} [get]
 func (h *Handler) getDebtorsHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	photographerID, err := strconv.Atoi(vars["photographerID"])
@@ -209,6 +278,15 @@ func (h *Handler) getDebtorsHandler(w http.ResponseWriter, r *http.Request) {
 	encodeResponse(w, debts)
 }
 
+// @Summary Добавляет оплату клиента фотографу
+// @Tags Financial
+// @Accept json
+// @Produce json
+// @Param request body AddPaymentRequest true "Payload для добавления оплаты"
+// @Success 200
+// @Failure 400 {string} text/plain
+// @Failure 500 {string} text/plain
+// @Router /payment [post]
 func (h *Handler) addPaymentHandler(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		PhotographerID int `json:"photographer_id"`
@@ -229,6 +307,15 @@ func (h *Handler) addPaymentHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// @Summary Получает детализированный список доходов фотографа
+// @Tags Financial
+// @Accept json
+// @Produce json
+// @Param photographerID path int true "ID фотографа"
+// @Success 200 {object} GetIncomesResponse "Список платежей и общий доход"
+// @Failure 400 {string} text/plain
+// @Failure 500 {string} text/plain
+// @Router /incomes/{photographerID} [get]
 func (h *Handler) getIncomesHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	photographerID, err := strconv.Atoi(vars["photographerID"])
