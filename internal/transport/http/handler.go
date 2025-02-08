@@ -19,11 +19,11 @@ type Service interface {
 	DeleteClient(ctx context.Context, id domain.ClientID) error
 	GetClients(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Client, error)
 
-	CreatDebt(ctx context.Context, photographerID domain.PhotographerID, clientID domain.ClientID, amount int) error
+	AddDebt(ctx context.Context, photographerID domain.PhotographerID, clientID domain.ClientID, amount int) error
 	GetDebts(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Debt, error)
 
-	CreatePayment(ctx context.Context, photographerID domain.PhotographerID, clientID domain.ClientID, amount int) error
-	GetPayments(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Payment, error)
+	AddPayment(ctx context.Context, photographerID domain.PhotographerID, clientID domain.ClientID, amount int) error
+	GetPayments(ctx context.Context, photographerID domain.PhotographerID) ([]domain.Payment, int, error)
 }
 
 type Handler struct {
@@ -49,20 +49,18 @@ func (h *Handler) Handle() *mux.Router {
 	router.HandleFunc("/clients/{photographerID}", h.getClientsHandler).Methods("GET")
 
 	// Операции с денежными средствами
-	router.HandleFunc("/debt", h.createDebtHandler).Methods("POST")                    // добавить запись о задолженности
-	router.HandleFunc("/transaction", h.createTransactionHandler).Methods("POST")      // провести оплату/возврат с обновлением debt_client
-	router.HandleFunc("/debtors/{photographerID}", h.getDebtorsHandler).Methods("GET") // список должников у фотографа
+	router.HandleFunc("/debt", h.addDebtHandler).Methods("POST")                       // добавить сумму задолженности
+	router.HandleFunc("/payment", h.addPaymentHandler).Methods("POST")                 // провести оплату с обновлением задолженности
+	router.HandleFunc("/debtors/{photographerID}", h.getDebtorsHandler).Methods("GET") // список должников фотографа
 	router.HandleFunc("/incomes/{photographerID}", h.getIncomesHandler).Methods("GET") // операции и суммарный доход у фотографа
 
 	return router
 }
 
 func (h *Handler) createPhotographerHandler(w http.ResponseWriter, r *http.Request) {
-	type createPhotographerRequest struct {
+	var req struct {
 		Name string `json:"name"`
 	}
-
-	var req createPhotographerRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("json decode error: %v", err)
@@ -76,10 +74,7 @@ func (h *Handler) createPhotographerHandler(w http.ResponseWriter, r *http.Reque
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err = json.NewEncoder(w).Encode(id); err != nil {
-		log.Printf("json encode error: %v", err)
-	}
+	encodeResponse(w, id)
 }
 
 func (h *Handler) getPhotographersHandler(w http.ResponseWriter, r *http.Request) {
@@ -90,19 +85,14 @@ func (h *Handler) getPhotographersHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err = json.NewEncoder(w).Encode(photographers); err != nil {
-		log.Printf("json encode error: %v", err)
-	}
+	encodeResponse(w, photographers)
 }
 
 func (h *Handler) createClientHandler(w http.ResponseWriter, r *http.Request) {
-	type createClientRequest struct {
+	var req struct {
 		PhotographerID domain.PhotographerID `json:"photographer_id"`
 		Name           string                `json:"name"`
 	}
-
-	var req createClientRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Printf("json decode error: %v", err)
@@ -116,10 +106,7 @@ func (h *Handler) createClientHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err = json.NewEncoder(w).Encode(id); err != nil {
-		log.Printf("json encode error: %v", err)
-	}
+	encodeResponse(w, id)
 }
 
 func (h *Handler) updateClientHandler(w http.ResponseWriter, r *http.Request) {
@@ -147,15 +134,21 @@ func (h *Handler) updateClientHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("update client error,: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	if err = json.NewEncoder(w).Encode(id); err != nil {
-		log.Printf("json encode error: %v", err)
-	}
 }
 
 func (h *Handler) deleteClientHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		log.Printf("convert id '%s' to int error: %v", vars["id"], err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
+	if err = h.service.DeleteClient(r.Context(), domain.ClientID(id)); err != nil {
+		log.Printf("delete client error: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
 }
 
 func (h *Handler) getClientsHandler(w http.ResponseWriter, r *http.Request) {
@@ -174,24 +167,99 @@ func (h *Handler) getClientsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err = json.NewEncoder(w).Encode(clients); err != nil {
-		log.Printf("json encode error: %v", err)
+	encodeResponse(w, clients)
+}
+
+func (h *Handler) addDebtHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PhotographerID int `json:"photographer_id"`
+		ClientID       int `json:"client_id"`
+		Amount         int `json:"amount"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("decode request body error: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.AddDebt(r.Context(), domain.PhotographerID(req.PhotographerID), domain.ClientID(req.ClientID), req.Amount); err != nil {
+		log.Printf("add debt error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 }
 
-func (h *Handler) createDebtHandler(w http.ResponseWriter, r *http.Request) {
-
-}
-
 func (h *Handler) getDebtorsHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	photographerID, err := strconv.Atoi(vars["photographerID"])
+	if err != nil {
+		log.Printf("convert id '%s' to int error: %v", vars["id"], err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
+	debts, err := h.service.GetDebts(r.Context(), domain.PhotographerID(photographerID))
+	if err != nil {
+		log.Printf("get debts error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	encodeResponse(w, debts)
 }
 
-func (h *Handler) createTransactionHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) addPaymentHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		PhotographerID int `json:"photographer_id"`
+		ClientID       int `json:"client_id"`
+		Amount         int `json:"amount"`
+	}
 
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("decode request body error: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := h.service.AddPayment(r.Context(), domain.PhotographerID(req.PhotographerID), domain.ClientID(req.ClientID), req.Amount); err != nil {
+		log.Printf("add payment error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) getIncomesHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	photographerID, err := strconv.Atoi(vars["photographerID"])
+	if err != nil {
+		log.Printf("convert id '%s' to int error: %v", vars["id"], err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
 
+	payments, total, err := h.service.GetPayments(r.Context(), domain.PhotographerID(photographerID))
+	if err != nil {
+		log.Printf("get payments error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	resp := struct {
+		Payments []domain.Payment `json:"payments"`
+		Total    int              `json:"total"`
+	}{
+		Payments: payments,
+		Total:    total,
+	}
+
+	encodeResponse(w, resp)
+}
+
+func encodeResponse(w http.ResponseWriter, data any) {
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("json encode error: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }

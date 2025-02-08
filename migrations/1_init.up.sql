@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS debts
     amount          INTEGER,
     occurred_at     TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT fk_photographer_id FOREIGN KEY (photographer_id) REFERENCES photographers (id) ON DELETE CASCADE,
-    CONSTRAINT fk_client_id FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE
+    CONSTRAINT fk_client_id FOREIGN KEY (client_id) REFERENCES clients (id) ON DELETE CASCADE,
+    CONSTRAINT unique_photographer_client UNIQUE (photographer_id, client_id)
 );
 
 CREATE TABLE IF NOT EXISTS payments
